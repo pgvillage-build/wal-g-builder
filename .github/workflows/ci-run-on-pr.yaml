@@ -5,7 +5,7 @@ on:
 
 env:
   WALGVERSION: v3.0.8b
-  WALGURL: https://github.com/mannemsolutions/wal-g.git
+  WALGURL: https://github.com/pgvillage-tools/wal-g.git
   COMPOSE_DOCKER_CLI_BUILD: 1
 
 jobs:
