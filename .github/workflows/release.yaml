@@ -6,7 +6,7 @@ on:
 
 env:
   WALGVERSION: ${{ github.ref_name }}
-  WALGURL: https://github.com/mannemsolutions/wal-g.git
+  WALGURL: https://github.com/pgvillage-tools/wal-g.git
   COMPOSE_DOCKER_CLI_BUILD: 1
 
 jobs:

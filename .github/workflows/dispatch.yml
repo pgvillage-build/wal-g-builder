@@ -5,7 +5,7 @@ on:
       remote:
         description: Remote to use. This should be a wal-g build repository.
         required: false
-        default: 'https://github.com/mannemsolutions/wal-g.git'
+        default: 'https://github.com/pgvillage-tools/wal-g.git'
       revision:
         description: Revision to use. This should be a branch, tag or commit on the wal-g repo specified as remote
         required: true
