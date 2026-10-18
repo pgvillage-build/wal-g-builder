@@ -29,3 +29,27 @@ services:
     working_dir: /host
     volumes:
       - ./:/host
+  deb-builder:
+    build:
+      context: .
+      dockerfile: docker/deb-builder/Dockerfile
+      args:
+        - BASEIMAGE=${DEB_BASEIMAGE:-debian:12}
+        - GITREV
+        - WALGVERSION
+    environment:
+      - WALGVERSION
+      - WALGURL
+    command:
+      - bash
+      - -c
+      - |
+        cd /host
+        ./scripts/build-deb.sh
+    network_mode: host
+    dns:
+      - 8.8.8.8
+      - 8.8.4.4
+    working_dir: /host
+    volumes:
+      - ./:/host
