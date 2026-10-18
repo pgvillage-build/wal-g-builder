@@ -57,3 +57,48 @@ jobs:
         env:
           DOCKER_DEFAULT_PLATFORM: linux/${{ matrix.arch }}
           DOCKER_BUILDKIT: 1
+
+  build-debs:
+    name: build for ${{ matrix.distro }} on ${{ matrix.arch }}
+    runs-on: ubuntu-latest
+    env:
+      DEB_BASEIMAGE: ${{ matrix.distro }}
+      WALGVERSION: ${{ inputs.revision }}
+      WALGURL: ${{ inputs.remote }}
+      COMPOSE_DOCKER_CLI_BUILD: 1
+    strategy:
+      fail-fast: false
+      matrix:
+        arch:
+          - arm64
+          - amd64
+        distro:
+          - debian:12
+          - debian:13
+          - ubuntu:22.04
+          - ubuntu:24.04
+          - ubuntu:26.04
+    steps:
+      - uses: actions/checkout@v7
+      - name: Set up QEMU
+        uses: docker/setup-qemu-action@v4
+      - name: Set up Docker Buildx
+        uses: docker/setup-buildx-action@v4
+      - name: git module stuff
+        run: |
+          git clone ${{ inputs.remote }} wal-g
+          cd wal-g
+          git checkout ${{ inputs.revision }}
+          git show --stat | head -n3
+      - name: update to docker-compose v2
+        run: |
+          sudo apt-get install -y curl
+          sudo curl -SL https://github.com/docker/compose/releases/download/v2.3.3/docker-compose-linux-x86_64 -o /usr/local/bin/docker-compose
+          sudo chmod +x /usr/local/bin/docker-compose
+      - name: compose
+        run: |
+          docker-compose up --exit-code-from deb-builder deb-builder
+          find debs
+        env:
+          DOCKER_DEFAULT_PLATFORM: linux/${{ matrix.arch }}
+          DOCKER_BUILDKIT: 1
