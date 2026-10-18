@@ -58,8 +58,29 @@ jobs:
           DOCKER_DEFAULT_PLATFORM: linux/${{ matrix.arch }}
           DOCKER_BUILDKIT: 1
 
+  versions:
+    name: list supported debian and ubuntu versions
+    runs-on: ubuntu-latest
+    outputs:
+      baseimage_version: ${{ steps.versions.outputs.baseimage_version }}
+    steps:
+      - name: list released and supported versions of debian and ubuntu
+        id: versions
+        run: |
+          TODAY=$(date +%F)
+          BASEIMAGE_VERSION=$(for DISTRO in debian ubuntu; do
+            curl -fsSL "https://endoflife.date/api/${DISTRO}.json" |
+              jq -c --arg distro "${DISTRO}" --arg today "${TODAY}" \
+                '.[] | select(.releaseDate <= $today and (.eol == false or ((.eol | type) == "string" and .eol > $today))) | "\($distro):\(.cycle)"'
+          done | jq -sc .)
+          echo "Building for ${BASEIMAGE_VERSION}"
+          [ "${BASEIMAGE_VERSION}" != "[]" ]
+          echo "baseimage_version=${BASEIMAGE_VERSION}" >> "$GITHUB_OUTPUT"
+
   build-debs:
     name: build for ${{ matrix.distro }} on ${{ matrix.arch }}
+    needs:
+      - versions
     runs-on: ubuntu-latest
     env:
       DEB_BASEIMAGE: ${{ matrix.distro }}
@@ -72,12 +93,8 @@ jobs:
         arch:
           - arm64
           - amd64
-        distro:
-          - debian:12
-          - debian:13
-          - ubuntu:22.04
-          - ubuntu:24.04
-          - ubuntu:26.04
+        # same distros as the apt repository in pgvillage-build/aptbuilder
+        distro: ${{ fromJSON(needs.versions.outputs.baseimage_version) }}
     steps:
       - uses: actions/checkout@v7
       - name: Set up QEMU
