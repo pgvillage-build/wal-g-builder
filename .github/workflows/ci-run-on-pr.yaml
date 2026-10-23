@@ -9,24 +9,54 @@ env:
   COMPOSE_DOCKER_CLI_BUILD: 1
 
 jobs:
+  versions:
+    name: list supported distro versions
+    runs-on: ubuntu-latest
+    outputs:
+      rpm_distros: ${{ steps.versions.outputs.rpm_distros }}
+      deb_distros: ${{ steps.versions.outputs.deb_distros }}
+    steps:
+      - name: list released and supported versions of all distros
+        id: versions
+        run: |
+          TODAY=$(date +%F)
+          # usage: supported <endoflife.date product> <image> <name>
+          # prints {image, name} for every released and not yet eol cycle
+          supported() {
+            curl -fsSL "https://endoflife.date/api/${1}.json" |
+              jq -c --arg image "${2}" --arg name "${3}" --arg today "${TODAY}" \
+                '.[] | select(.releaseDate <= $today and (.eol == false or ((.eol | type) == "string" and .eol > $today))) | {image: "\($image):\(.cycle)", name: "\($name)-\(.cycle)"}'
+          }
+          RPM_DISTROS=$({
+            supported rocky-linux rockylinux/rockylinux el
+            supported opensuse opensuse/leap opensuse-leap
+            supported fedora fedora fedora
+          } | jq -sc .)
+          DEB_DISTROS=$({
+            supported debian debian debian
+            supported ubuntu ubuntu ubuntu
+          } | jq -sc .)
+          echo "Building rpms for ${RPM_DISTROS}"
+          echo "Building debs for ${DEB_DISTROS}"
+          [ "${RPM_DISTROS}" != "[]" ] && [ "${DEB_DISTROS}" != "[]" ]
+          echo "rpm_distros=${RPM_DISTROS}" >> "$GITHUB_OUTPUT"
+          echo "deb_distros=${DEB_DISTROS}" >> "$GITHUB_OUTPUT"
+
   build-rpms:
-    name: build for ${{ matrix.distro }} on ${{ matrix.arch }}
+    name: build for ${{ matrix.distro.name }} on ${{ matrix.arch }}
+    needs:
+      - versions
     runs-on: ubuntu-latest
     env:
-      BASEIMAGE: ${{ matrix.distro }}
+      BASEIMAGE: ${{ matrix.distro.image }}
     strategy:
       fail-fast: false
       matrix:
         arch:
           - arm64
           - amd64
-        distro:
-          #- rockylinux:8
-          - rockylinux:9
-          - fedora:39
-          #- fedora:40
-          #- fedora:41
-          #- fedora:42
+        # el (rocky), opensuse leap and fedora
+        distro: ${{ fromJSON(needs.versions.outputs.rpm_distros) }}
     steps:
       - uses: actions/checkout@v7
       - name: Set up QEMU
@@ -35,9 +65,9 @@ jobs:
         uses: docker/setup-buildx-action@v4
       - name: git module stuff
         run: |
-          git clone ${{ env.WALGURL }} wal-g
+          git clone $WALGURL wal-g
           cd wal-g
-          git checkout ${{ env.WALGVERSION }}
+          git checkout $WALGVERSION
           git show --stat | head -n3
       - name: update to docker-compose v2
         run: |
@@ -46,38 +76,19 @@ jobs:
           sudo chmod +x /usr/local/bin/docker-compose
       - name: compose
         run: |
-          docker-compose up builder
+          docker-compose up --exit-code-from builder builder
           find rpms
         env:
           DOCKER_DEFAULT_PLATFORM: linux/${{ matrix.arch }}
           DOCKER_BUILDKIT: 1
 
-  versions:
-    name: list supported debian and ubuntu versions
-    runs-on: ubuntu-latest
-    outputs:
-      baseimage_version: ${{ steps.versions.outputs.baseimage_version }}
-    steps:
-      - name: list released and supported versions of debian and ubuntu
-        id: versions
-        run: |
-          TODAY=$(date +%F)
-          BASEIMAGE_VERSION=$(for DISTRO in debian ubuntu; do
-            curl -fsSL "https://endoflife.date/api/${DISTRO}.json" |
-              jq -c --arg distro "${DISTRO}" --arg today "${TODAY}" \
-                '.[] | select(.releaseDate <= $today and (.eol == false or ((.eol | type) == "string" and .eol > $today))) | "\($distro):\(.cycle)"'
-          done | jq -sc .)
-          echo "Building for ${BASEIMAGE_VERSION}"
-          [ "${BASEIMAGE_VERSION}" != "[]" ]
-          echo "baseimage_version=${BASEIMAGE_VERSION}" >> "$GITHUB_OUTPUT"
-
   build-debs:
-    name: build for ${{ matrix.distro }} on ${{ matrix.arch }}
+    name: build for ${{ matrix.distro.name }} on ${{ matrix.arch }}
     needs:
       - versions
     runs-on: ubuntu-latest
     env:
-      DEB_BASEIMAGE: ${{ matrix.distro }}
+      DEB_BASEIMAGE: ${{ matrix.distro.image }}
     strategy:
       fail-fast: false
       matrix:
@@ -85,7 +96,7 @@ jobs:
           - arm64
           - amd64
         # same distros as the apt repository in pgvillage-build/aptbuilder
-        distro: ${{ fromJSON(needs.versions.outputs.baseimage_version) }}
+        distro: ${{ fromJSON(needs.versions.outputs.deb_distros) }}
     steps:
       - uses: actions/checkout@v7
       - name: Set up QEMU
@@ -94,9 +105,9 @@ jobs:
         uses: docker/setup-buildx-action@v4
       - name: git module stuff
         run: |
-          git clone ${{ env.WALGURL }} wal-g
+          git clone $WALGURL wal-g
           cd wal-g
-          git checkout ${{ env.WALGVERSION }}
+          git checkout $WALGVERSION
           git show --stat | head -n3
       - name: update to docker-compose v2
         run: |

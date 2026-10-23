@@ -67,13 +67,15 @@ install -m 0755 "${WALGBINARY}" "${PKG_ROOT}/usr/local/bin/wal-g-pg"
 
 INSTALLED_SIZE="$(du -sk "${PKG_ROOT}" | cut -f1)"
 
+# No Depends: libsodium, lzo and brotli are linked statically and libc6 is
+# essential.
+
 cat > "${PKG_ROOT}/DEBIAN/control" <<EOF
 Package: ${PKG_NAME}
 Version: ${VERSION}-${REVISION}
 Section: database
 Priority: optional
 Architecture: ${ARCH}
-Depends: libsodium23, liblzo2-2, libbrotli1
 Maintainer: pgvillage-tools <noreply@github.com>
 Installed-Size: ${INSTALLED_SIZE}
 Homepage: ${WALGURL}

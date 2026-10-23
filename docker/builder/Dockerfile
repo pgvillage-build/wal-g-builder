@@ -2,9 +2,20 @@ ARG BASEIMAGE=rockylinux:10
 FROM ${BASEIMAGE} AS build-stage
 ARG GITREV
 ARG WALGVERSION
-RUN grep -qi ID=fedora /etc/os-release || dnf install -y epel-release && \
-    dnf install -y git cmake rpm-build lzo-devel libsodium-devel tar gcc make pkg-config && \
-    dnf clean all
+# el needs epel (libsodium) and crb (lzo-devel), fedora and opensuse have it all
+RUN . /etc/os-release && \
+    case "${ID}" in \
+      opensuse*) \
+        zypper -n install git cmake rpm-build lzo-devel libsodium-devel tar gzip curl gcc make pkg-config && \
+        zypper clean -a ;; \
+      fedora) \
+        dnf install -y git cmake rpm-build lzo-devel libsodium-devel tar gcc make pkg-config && \
+        dnf clean all ;; \
+      *) \
+        dnf install -y dnf-plugins-core epel-release && crb enable && \
+        dnf install -y git cmake rpm-build lzo-devel libsodium-devel tar gcc make pkg-config && \
+        dnf clean all ;; \
+    esac
 
 ENV GO_VERSION=1.27.1
 ENV PATH=$PATH:/usr/local/go/bin
@@ -25,6 +36,10 @@ RUN USE_BROTLI=yes USE_LIBSODIUM=yes USE_LZO=yes make deps && \
 
 FROM ${BASEIMAGE}
 COPY --from=build-stage /usr/local/bin/wal-g-pg /usr/local/bin/
-RUN grep -qi ID=fedora /etc/os-release || dnf install -y epel-release && \
-    dnf install -y libsodium lzo brotli rpm-build
+# wal-g-pg links libsodium, lzo and brotli statically, so only rpm-build is needed
+RUN if grep -qi '^ID=.*opensuse' /etc/os-release; then \
+      zypper -n install rpm-build && zypper clean -a; \
+    else \
+      dnf install -y rpm-build && dnf clean all; \
+    fi
 CMD /usr/local/bin/wal-g-pg

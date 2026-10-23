@@ -7,9 +7,8 @@ License: Apache-2.0
 Group: Applications/Databases
 Url: %{_url}
 BuildArch: %{_arch}
-Requires: libsodium
-Requires: lzo
-Requires: brotli
+# libsodium, lzo and brotli are linked statically; rpmbuild generates the
+# remaining (glibc) dependencies automatically.
 
 %description
 Archival and Restoration for databases in the Cloud
