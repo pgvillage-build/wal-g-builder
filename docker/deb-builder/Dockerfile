@@ -25,9 +25,6 @@ RUN USE_BROTLI=yes USE_LIBSODIUM=yes USE_LZO=yes make deps && \
     go build -v -tags "brotli libsodium liblzo" -ldflags "-s -w -X github.com/wal-g/wal-g/cmd/pg.buildDate=`date -u +%Y.%m.%d_%H:%M:%S` -X github.com/wal-g/wal-g/cmd/pg.gitRevision=$GITREV -X github.com/wal-g/wal-g/cmd/pg.walgVersion=$WALGVERSION" -o /usr/local/bin/wal-g-pg ./main/pg
 
 FROM ${BASEIMAGE}
+# wal-g-pg links libsodium, lzo and brotli statically, so no runtime packages
 COPY --from=build-stage /usr/local/bin/wal-g-pg /usr/local/bin/
-RUN apt-get update && \
-    DEBIAN_FRONTEND=noninteractive apt-get install -y --no-install-recommends \
-      libsodium23 liblzo2-2 libbrotli1 && \
-    rm -rf /var/lib/apt/lists/*
 CMD /usr/local/bin/wal-g-pg

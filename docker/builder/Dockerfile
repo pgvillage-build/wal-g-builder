@@ -36,15 +36,10 @@ RUN USE_BROTLI=yes USE_LIBSODIUM=yes USE_LZO=yes make deps && \
 
 FROM ${BASEIMAGE}
 COPY --from=build-stage /usr/local/bin/wal-g-pg /usr/local/bin/
-RUN . /etc/os-release && \
-    case "${ID}" in \
-      opensuse*) \
-        zypper -n install libsodium23 liblzo2-2 rpm-build && \
-        zypper clean -a ;; \
-      fedora) \
-        dnf install -y libsodium lzo brotli rpm-build ;; \
-      *) \
-        dnf install -y epel-release && \
-        dnf install -y libsodium lzo brotli rpm-build ;; \
-    esac
+# wal-g-pg links libsodium, lzo and brotli statically, so only rpm-build is needed
+RUN if grep -qi '^ID=.*opensuse' /etc/os-release; then \
+      zypper -n install rpm-build && zypper clean -a; \
+    else \
+      dnf install -y rpm-build && dnf clean all; \
+    fi
 CMD /usr/local/bin/wal-g-pg
